@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewBtn = document.getElementById('previewBtn');
     const previewModal = document.getElementById('previewModal');
     const previewPdfViewer = document.getElementById('previewPdfViewer');
+    const sourcePdfViewer = document.getElementById('sourcePdfViewer');
     const importEditorFileBtn = document.getElementById('importEditorFileBtn');
     const editorFileInput = document.getElementById('editorFileInput');
     const quickImportEditorBtn = document.getElementById('quickImportEditorBtn');
@@ -36,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // const translationMemoryFileName = document.getElementById('translationMemoryFileName');
     let translatedFilename = 'Translated_Document.docx';
     let translatedBlob = null;
+    let sourcePdfBlob = null;
+    let translatedPdfBlob = null;
     let editorDirty = false;
     let previewRequestId = 0;
     let previewObjectUrl = null;
@@ -56,22 +59,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return pdfjsPromise;
     }
 
-    async function renderPdfPreview(previewBlob) {
-        const previousScrollTop = previewPdfViewer.scrollTop;
+    async function renderPdfPreview(previewBlob, viewer = previewPdfViewer) {
+        const previousScrollTop = viewer.scrollTop;
         const pdfjs = await loadPdfJs();
         const bytes = new Uint8Array(await previewBlob.arrayBuffer());
-        previewPdfViewer.replaceChildren();
+        viewer.replaceChildren();
         activePreviewPage = -1;
         const loadingMessage = document.createElement('p');
         loadingMessage.className = 'preview-pdf-loading';
         loadingMessage.textContent = 'Đang render PDF...';
-        previewPdfViewer.appendChild(loadingMessage);
+        viewer.appendChild(loadingMessage);
         try {
             previewPdfDocument = await pdfjs.getDocument({ data: bytes }).promise;
         } catch (workerError) {
             previewPdfDocument = await pdfjs.getDocument({ data: bytes, disableWorker: true }).promise;
         }
-        previewPdfViewer.replaceChildren();
+        viewer.replaceChildren();
 
         const pageTexts = await Promise.all(
             Array.from({ length: previewPdfDocument.numPages }, async (_, index) => {
@@ -83,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let pageCount = pageTexts.length;
         while (pageCount > 1 && !pageTexts[pageCount - 1]) pageCount -= 1;
 
-        const viewerWidth = Math.max(previewPdfViewer.clientWidth - 24, 320);
+        const viewerWidth = Math.max(viewer.clientWidth - 24, 320);
         for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
             const page = await previewPdfDocument.getPage(pageNumber);
             const baseViewport = page.getViewport({ scale: 1 });
@@ -98,11 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = Math.ceil(viewport.height);
             canvas.setAttribute('aria-label', `PDF page ${pageNumber}`);
             pageElement.appendChild(canvas);
-            previewPdfViewer.appendChild(pageElement);
+            viewer.appendChild(pageElement);
             await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         }
         pdfPageTexts = pageTexts.slice(0, pageCount);
-        previewPdfViewer.scrollTop = Math.min(previousScrollTop, previewPdfViewer.scrollHeight);
+        viewer.scrollTop = Math.min(previousScrollTop, viewer.scrollHeight);
     }
 
     function normalizeSearchText(value) {
@@ -579,6 +582,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return btoa(binary);
     }
 
+    function base64ToBlob(value, type) {
+        const binary = atob(value);
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        return new Blob([bytes], { type });
+    }
+
     function collectTextEdits() {
         const edits = [...documentEditor.querySelectorAll('[data-editor-node-id], [data-xml-id]')]
             .filter((node) => !node.dataset.nonEditable && !node.closest('[data-non-editable="true"]'))
@@ -642,11 +651,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!translatedBlob) return;
         const requestId = ++previewRequestId;
         try {
-            const previewBlob = await requestPreviewPdf();
+            const previewBlob = (!editorDirty && translatedPdfBlob) || await requestPreviewPdf();
             if (requestId !== previewRequestId || previewModal.classList.contains('hidden')) return;
             if (previewObjectUrl) window.URL.revokeObjectURL(previewObjectUrl);
             previewObjectUrl = window.URL.createObjectURL(previewBlob);
             await renderPdfPreview(previewBlob);
+            if (sourcePdfBlob && sourcePdfViewer) await renderPdfPreview(sourcePdfBlob, sourcePdfViewer);
         } catch (error) {
             if (requestId !== previewRequestId) return;
             previewPdfViewer.replaceChildren();
@@ -878,12 +888,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             updateProgress(82, 'Đang chuẩn bị tài liệu để chỉnh sửa...');
-            const blob = await response.blob();
+            const result = fileExtension === 'docx'
+                ? await response.json()
+                : null;
+            const blob = result
+                ? base64ToBlob(result.document_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+                : await response.blob();
             translatedBlob = blob;
             if (isEditableInBrowser(file.name)) {
+                sourcePdfBlob = result?.source_pdf_base64
+                    ? base64ToBlob(result.source_pdf_base64, 'application/pdf') : null;
+                translatedPdfBlob = result?.translated_pdf_base64
+                    ? base64ToBlob(result.translated_pdf_base64, 'application/pdf') : null;
                 await renderTranslatedDocument(blob, `Translated_${file.name}`);
                 hideProgress();
                 updateEditorStatus('Translation is ready in the editor and preview.', 'success');
+                openPreview();
             } else {
                 downloadBlob(blob, `Translated_${file.name}`);
                 translatedBlob = null;

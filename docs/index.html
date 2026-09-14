@@ -108,8 +108,12 @@
             <aside class="preview-modal preview-panel hidden" id="previewModal">
                 <section class="preview-dialog">
                     <div class="preview-frame-wrap">
-                        <div id="previewPdfViewer" class="preview-pdf-viewer"
-                            aria-label="PDF document preview"></div>
+                        <div class="comparison-pdf-viewers">
+                            <section><h3>Original (glossary highlights)</h3><div id="sourcePdfViewer"
+                                class="preview-pdf-viewer" aria-label="Original PDF preview"></div></section>
+                            <section><h3>Translated (glossary highlights)</h3><div id="previewPdfViewer"
+                                class="preview-pdf-viewer" aria-label="Translated PDF preview"></div></section>
+                        </div>
                     </div>
                 </section>
             </aside>
@@ -119,7 +123,7 @@
     <!-- <script src="translation_memory/translation-memory.js"></script> -->
     <!-- Set the public backend URL in config.js before deploying this folder. -->
     <script src="config.js"></script>
-    <script src="app.js?v=20260914"></script>
+    <script src="app.js?v=20260914-compare"></script>
 </body>
 
 </html>

@@ -655,8 +655,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (requestId !== previewRequestId || previewModal.classList.contains('hidden')) return;
             if (previewObjectUrl) window.URL.revokeObjectURL(previewObjectUrl);
             previewObjectUrl = window.URL.createObjectURL(previewBlob);
-            await renderPdfPreview(previewBlob);
-            if (sourcePdfBlob && sourcePdfViewer) await renderPdfPreview(sourcePdfBlob, sourcePdfViewer);
+            const sourceUrl = sourcePdfBlob ? window.URL.createObjectURL(sourcePdfBlob) : '';
+            const installPdfFrame = (viewer, url, label) => {
+                if (!viewer || !url) return;
+                viewer.replaceChildren();
+                const frame = document.createElement('iframe');
+                frame.className = 'pdf-preview-frame';
+                frame.title = label;
+                frame.src = url;
+                viewer.appendChild(frame);
+            };
+            installPdfFrame(sourcePdfViewer, sourceUrl, 'Original document with glossary highlights');
+            installPdfFrame(previewPdfViewer, previewObjectUrl, 'Translated document with glossary highlights');
         } catch (error) {
             if (requestId !== previewRequestId) return;
             previewPdfViewer.replaceChildren();

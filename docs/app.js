@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     const hostName = window.location.hostname || 'localhost';
     const configuredApiBase = window.TRANSLATION_CONFIG?.API_BASE_URL?.trim();
-    const apiBase = (configuredApiBase || `http://${hostName}:8000`).replace(/\/+$/, '');
+    const localHost = hostName === 'localhost' || hostName === '127.0.0.1';
+    const apiBase = (localHost ? `http://${hostName}:8000` : configuredApiBase).replace(/\/+$/, '');
     const ngrokHeaders = { 'ngrok-skip-browser-warning': 'true' };
 
     const translationForm = document.getElementById('translationForm');
@@ -32,6 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const importEditorFileBtn = document.getElementById('importEditorFileBtn');
     const editorFileInput = document.getElementById('editorFileInput');
     const quickImportEditorBtn = document.getElementById('quickImportEditorBtn');
+    // Keep the comparison/editor flow available for a future rollout.
+    const ENABLE_COMPARISON_UI = false;
     const quickEditorFileInput = document.getElementById('quickEditorFileInput');
     // const translationMemoryFileInput = document.getElementById('translationMemoryFile');
     // const translationMemoryFileName = document.getElementById('translationMemoryFileName');
@@ -675,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function openPreview() {
-        if (!translatedBlob || !documentEditor.innerHTML.trim()) return;
+        if (!translatedBlob) return;
         previewModal.classList.remove('hidden');
         editorShell?.classList.add('preview-is-open');
         document.body.classList.add('preview-open');
@@ -886,31 +889,40 @@ document.addEventListener('DOMContentLoaded', () => {
         setProcessingState(true);
 
         try {
-            const response = await fetch(`${apiBase}/api/v1/translate`, {
-                method: 'POST',
-                headers: ngrokHeaders,
-                body: formData
-            });
+            const includeComparison = ENABLE_COMPARISON_UI && isEditableInBrowser(file.name);
+            const response = await fetch(
+                `${apiBase}/api/v1/translate?include_comparison=${includeComparison}`,
+                {
+                    method: 'POST',
+                    headers: ngrokHeaders,
+                    body: formData
+                }
+            );
 
             if (!response.ok) {
                 const errJson = await response.json().catch(() => null);
                 throw new Error(errJson?.detail || 'Lỗi xử lý dịch thuật từ Server.');
             }
 
-            updateProgress(82, 'Đang chuẩn bị tài liệu để chỉnh sửa...');
-            const result = fileExtension === 'docx'
+            updateProgress(82, includeComparison
+                ? 'Đang chuẩn bị tài liệu để chỉnh sửa...'
+                : 'Đang chuẩn bị file để tải xuống...');
+            const responseType = response.headers.get('content-type') || '';
+            const result = responseType.includes('application/json')
                 ? await response.json()
                 : null;
             const blob = result
                 ? base64ToBlob(result.document_base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
                 : await response.blob();
             translatedBlob = blob;
-            if (isEditableInBrowser(file.name)) {
+            if (includeComparison) {
                 sourcePdfBlob = result?.source_pdf_base64
                     ? base64ToBlob(result.source_pdf_base64, 'application/pdf') : null;
                 translatedPdfBlob = result?.translated_pdf_base64
                     ? base64ToBlob(result.translated_pdf_base64, 'application/pdf') : null;
-                await renderTranslatedDocument(blob, `Translated_${file.name}`);
+                translatedFilename = `Translated_${file.name}`;
+                translationView.classList.add('hidden');
+                editorView.classList.remove('hidden');
                 hideProgress();
                 updateEditorStatus('Translation is ready in the editor and preview.', 'success');
                 openPreview();
@@ -918,14 +930,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 downloadBlob(blob, `Translated_${file.name}`);
                 translatedBlob = null;
                 hideProgress();
-                updateStatus('PPTX translation completed. The translated file has been downloaded.', 'success');
+                updateStatus('Dịch hoàn tất. File đã được tự động tải xuống.', 'success');
             }
-            if (isEditableInBrowser(file.name)) {
+            if (includeComparison) {
                 updateStatus('Dịch xong. Bạn có thể rà soát và export khi sẵn sàng.', 'success');
             }
         } catch (err) {
             console.error(err);
-            updateStatus(`Lỗi: ${err.message}`, 'error');
+            const message = `Lỗi trong quá trình dịch: ${err.message || 'Đã xảy ra lỗi không xác định.'}`;
+            updateStatus(message, 'error');
+            window.alert(message);
+            window.location.reload();
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Dịch tài liệu';
@@ -973,12 +988,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    previewBtn.addEventListener('click', openPreview);
-    previewModal.querySelectorAll('[data-close-preview]').forEach((element) => {
+    previewBtn?.addEventListener('click', openPreview);
+    previewModal?.querySelectorAll('[data-close-preview]').forEach((element) => {
         element.addEventListener('click', closePreview);
     });
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && !previewModal.classList.contains('hidden')) closePreview();
+        if (event.key === 'Escape' && previewModal && !previewModal.classList.contains('hidden')) closePreview();
     });
 
     document.getElementById('backToTranslationBtn').addEventListener('click', () => {

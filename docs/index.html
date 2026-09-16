@@ -80,17 +80,15 @@
             </div>
             <div class="editor-actions">
                 <!-- Import test file is intentionally hidden for the demo. -->
+                <!-- HTML editor is temporarily disabled; comparison uses generated PDFs. -->
                 <input type="file" id="editorFileInput" accept=".docx" hidden>
                 <button type="button" class="secondary-button" id="backToTranslationBtn">Dịch tài liệu khác</button>
-                <!-- <label class="secondary-button" for="translationMemoryFile">Load TM JSON</label> -->
-                <!-- <input type="file" id="translationMemoryFile" accept=".json,application/json" hidden> -->
-                <!-- <span id="translationMemoryFileName" class="editor-file-name"></span> -->
-                <button type="button" class="preview-button" id="previewBtn">Preview</button>
                 <button type="button" class="export-button" id="exportBtn">Export tài liệu</button>
             </div>
         </header>
         <div class="editor-shell">
-            <aside class="editor-tools" id="editorTools">
+            <!-- HTML editor is disabled for the customer demo. -->
+            <!-- <aside class="editor-tools" id="editorTools">
                 <div class="navigation-panel">
                     <div class="navigation-heading">
                         <h2>Navigation</h2>
@@ -100,11 +98,9 @@
                         <p class="navigation-empty">Chưa tìm thấy section.</p>
                     </div>
                 </div>
-            </aside>
-            <article class="document-stage">
-                <div id="documentEditor" contenteditable="false" spellcheck="false"
-                    aria-label="Editable translated document"></div>
-            </article>
+            </aside> -->
+            <div id="documentEditor" class="demo-editor-placeholder" aria-hidden="true"></div>
+            <!-- Comparison/review UI is disabled until it is needed again.
             <aside class="preview-modal preview-panel hidden" id="previewModal">
                 <section class="preview-dialog">
                     <div class="preview-frame-wrap">
@@ -116,14 +112,14 @@
                         </div>
                     </div>
                 </section>
-            </aside>
+            </aside> -->
         </div>
     </section>
 
     <!-- <script src="translation_memory/translation-memory.js"></script> -->
     <!-- Set the public backend URL in config.js before deploying this folder. -->
     <script src="config.js"></script>
-    <script src="app.js?v=20260914-compare-iframe"></script>
+    <script src="app.js"></script>
 </body>
 
 </html>

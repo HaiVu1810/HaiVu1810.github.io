@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const hostName = window.location.hostname || 'localhost';
     const configuredApiBase = window.TRANSLATION_CONFIG?.API_BASE_URL?.trim();
-    const apiBase = (configuredApiBase || `http://${hostName}:8000`).replace(/\/+$/, '');
+    const localHost = hostName === 'localhost' || hostName === '127.0.0.1';
+    const apiBase = (localHost ? `http://${hostName}:8000` : configuredApiBase).replace(/\/+$/, '');
     const ngrokHeaders = { 'ngrok-skip-browser-warning': 'true' };
     const stage = document.getElementById('stage');
     const slideList = document.getElementById('slideList');
